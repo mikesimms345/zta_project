@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>ZTA verification prototype</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body><main>
+  <h1>ZTA verification prototype</h1>
+  <p>Live webcam media check for the SSH access prototype.</p>
+  {% if username %}
+  <p>Signed in as <strong>{{ username }}</strong>. <button id="logout">Sign out</button></p>
+  <video id="preview" autoplay muted playsinline></video>
+  <fieldset id="model-selector" aria-describedby="model-help">
+    <legend>Detection model</legend>
+    <label><input type="radio" name="model" value="cnn" checked> CNN</label>
+    <label><input type="radio" name="model" value="vit"> ViT</label>
+  </fieldset>
+  <p id="model-help">Switching models stops the current check. Start a new check to use the selected model.</p>
+  <div><button id="start">Start camera check</button> <button id="stop" disabled>Stop</button></div>
+  <p id="result">No evidence collected.</p>
+  <p>This checks for synthetic media. It does not establish identity or grant SSH access.</p>
+  {% else %}
+  <form id="login">
+    <label>Username <input name="username" autocomplete="username" required maxlength="80"></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+    <button>Sign in</button>
+  </form>
+  {% endif %}
+  <p id="message" role="status" aria-live="polite"></p>
+</main><script type="module" src="{{ url_for('static', filename='app.js') }}"></script></body>
+</html>

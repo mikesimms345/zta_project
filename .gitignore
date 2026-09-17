@@ -1,0 +1,7 @@
+__pycache__/
+.venv/
+.venv-inference/
+instance/
+.env
+*.db
+*.pem

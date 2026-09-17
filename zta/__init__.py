@@ -1,0 +1,1 @@
+"""Standalone verification evidence pipeline."""
