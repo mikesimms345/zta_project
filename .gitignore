@@ -6,3 +6,5 @@ instance/
 *.db
 *.pem
 AGENTS.md
+docs/sessions
+.DS_Store
