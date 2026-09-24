@@ -62,22 +62,6 @@ The default policy retains the capstone's 75-frame window and 70% fake threshold
 Sampling waits for each response, so 75 frames need at least approximately 15
 seconds plus inference/network time. Thresholds are inherited, not calibrated.
 
-## Tests
-
-```sh
-.venv/bin/python -m unittest discover -s tests -v
-node --check zta/web/static/app.js
-```
-
-Tests inject classifiers to check evidence aggregation, expiry, capture ownership,
-CSRF, account login, input bounds, and unavailable models without heavyweight ML
-initialization. Real-model smoke testing is separate from accuracy validation.
-
-Validation on 2026-09-16: 12 automated tests passed; JavaScript syntax check passed;
-the actual TFLite model accepted a generated 640×480 JPEG and returned a label.
-Its input tensor is `[1, 224, 224, 3]`, output `[1, 1]`. This confirms execution,
-not classification accuracy. Physical webcam capture remains a manual check.
-
 ## Provenance and remaining work
 
 `models/` contains the retained model assets copied from the original capstone.
