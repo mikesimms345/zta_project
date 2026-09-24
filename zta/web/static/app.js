@@ -4,8 +4,7 @@ let stream, captureId, timer, running = false, generation = 0;
 const video = document.querySelector('#preview');
 const startButton = document.querySelector('#start');
 const stopButton = document.querySelector('#stop');
-const modelSelector = document.querySelector('#model-selector');
-const selectedModel = () => document.querySelector('input[name="model"]:checked').value;
+
 
 async function api(path, method, body, type = 'application/json') {
   const response = await fetch(path, {method, body, headers: {'X-CSRF-Token': csrf, 'Content-Type': type}});
@@ -69,29 +68,19 @@ async function sendFrame(token) {
 
 startButton?.addEventListener('click', async () => {
   startButton.disabled = true;
-  modelSelector.disabled = true;
-  const model = selectedModel();
   message.textContent = '';
   document.querySelector('#result').textContent = 'No evidence collected.';
   try {
     stream = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 640}, height: {ideal: 480}}, audio: false});
     video.srcObject = stream;
     await video.play();
-    captureId = (await api('/api/captures', 'POST', JSON.stringify({model}))).capture_id;
+    captureId = (await api('/api/captures', 'POST')).capture_id;
     running = true;
     stopButton.disabled = false;
     const token = ++generation;
     stream.getVideoTracks()[0].addEventListener('ended', () => { void stop(); });
     void sendFrame(token);
   } catch (error) { message.textContent = error.message; await stop(); }
-  finally { modelSelector.disabled = false; }
-});
-modelSelector?.addEventListener('change', async () => {
-  modelSelector.disabled = true;
-  await stop();
-  document.querySelector('#result').textContent = 'No evidence collected.';
-  message.textContent = `${selectedModel() === 'cnn' ? 'CNN' : 'ViT'} selected. Start a new camera check.`;
-  modelSelector.disabled = false;
 });
 stopButton?.addEventListener('click', () => { void stop(); });
 document.querySelector('#logout')?.addEventListener('click', async () => {

@@ -5,3 +5,4 @@ instance/
 .env
 *.db
 *.pem
+AGENTS.md

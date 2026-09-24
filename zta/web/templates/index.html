@@ -13,12 +13,6 @@
   {% if username %}
   <p>Signed in as <strong>{{ username }}</strong>. <button id="logout">Sign out</button></p>
   <video id="preview" autoplay muted playsinline></video>
-  <fieldset id="model-selector" aria-describedby="model-help">
-    <legend>Detection model</legend>
-    <label><input type="radio" name="model" value="cnn" checked> CNN</label>
-    <label><input type="radio" name="model" value="vit"> ViT</label>
-  </fieldset>
-  <p id="model-help">Switching models stops the current check. Start a new check to use the selected model.</p>
   <div><button id="start">Start camera check</button> <button id="stop" disabled>Stop</button></div>
   <p id="result">No evidence collected.</p>
   <p>This checks for synthetic media. It does not establish identity or grant SSH access.</p>

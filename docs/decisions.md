@@ -28,15 +28,14 @@ Record decisions that change project direction, architecture, threat exposure, o
   local webcam harness. Automated repeat-check behavior is explicitly deferred.
   Define SSH targets and authorization before implementing a credential broker.
 
-### 2026-09-16 — Per-capture model selection
+### 2026-09-17 — CNN-only model check
 
 - **Status:** decided
-- **Decision:** Add CNN/ViT radio selection, pin the model per capture, and start a
-  fresh evidence window when the user changes models. Keep CNN as default.
-- **Why:** User requested a model toggle; adapters preserve modularity.
-- **Security impact:** No cross-user global model setting; model errors do not
-  silently switch backends or add evidence.
-- **Alternatives considered:** A global mutable classifier mixes user choices;
-  switching inside an existing window mixes evidence from different detectors.
-- **Consequences / next steps:** ViT adds PyTorch/Transformers dependencies.
-  Accuracy and threshold calibration remain separate validation work.
+- **Decision:** Use a single CNN backend and remove model selection from the UI
+  and application service. Retain classifier injection for testing and upgrades.
+- **Why:** User selected CNN as the only model check going forward.
+- **Security impact:** Requests cannot choose another model; failures remain
+  unavailable results and do not add evidence.
+- **Alternatives considered:** Keeping a multi-model registry adds unused complexity.
+- **Consequences / next steps:** Reduced runtime dependencies. Biometric matching
+  and device authentication remain separate future layers.

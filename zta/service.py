@@ -1,4 +1,4 @@
-"""Application orchestration with bounded, expiring per-capture state."""
+"""Application orchestration with expiring per-capture state."""
 from dataclasses import dataclass
 from threading import RLock
 from time import monotonic
@@ -22,16 +22,14 @@ class CaptureSession:
     expires_at: float
     window: object
     model_id: str = ""
-    model_key: str = "cnn"
 
 
 class VerificationService:
     def __init__(self, classifier: FrameClassifier, policy=None, *, clock=monotonic,
-                 ttl=300, max_sessions=32, classifiers=None):
+                 ttl=300, max_sessions=32):
         if ttl <= 0 or max_sessions < 1:
             raise ValueError("ttl and max_sessions must be positive")
         self.classifier = classifier
-        self.classifiers = dict(classifiers) if classifiers is not None else {"cnn": classifier}
         self.policy = policy or EvidencePolicy()
         self.clock, self.ttl, self.max_sessions = clock, ttl, max_sessions
         self._sessions = {}
@@ -43,9 +41,7 @@ class VerificationService:
             if self._sessions[key].expires_at <= now:
                 del self._sessions[key]
 
-    def start(self, owner, model_key="cnn"):
-        if not isinstance(model_key, str) or model_key not in self.classifiers:
-            raise ValueError("Unknown model")
+    def start(self, owner):
         if not owner:
             raise ValueError("owner is required")
         with self._lock:
@@ -54,7 +50,7 @@ class VerificationService:
                 raise CapacityExceeded("Capture capacity reached")
             key = uuid4().hex
             self._sessions[key] = CaptureSession(owner, self.clock() + self.ttl,
-                                                  self.policy.new_window(), model_key=model_key)
+                                                  self.policy.new_window())
             return key
 
     def _get(self, key, owner):
@@ -69,7 +65,7 @@ class VerificationService:
         # deployment should inject a durable store and a bounded inference worker.
         with self._lock:
             capture = self._get(key, owner)
-            prediction = self.classifiers[capture.model_key].classify(encoded_image)
+            prediction = self.classifier.classify(encoded_image)
             capture = self._get(key, owner)  # inference may outlive the capture TTL
             if not isinstance(prediction.label, Label) or not prediction.model_id:
                 raise ModelUnavailable("Invalid classifier result")

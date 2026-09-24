@@ -25,14 +25,3 @@ Use one entry per meaningful finding.
 - **Security implication:** Synthetic-media detection is a separate signal from
   identity and authorization; no existing specification establishes it as sufficient.
 - **Follow-up:** Define SSH policy and evaluate media detection before enforcement.
-
-### 2026-09-16 — MobileViT adapter
-
-- **Question:** How should the saved ViT model be loaded and preprocessed?
-- **Source:** https://huggingface.co/docs/transformers/model_doc/mobilevit and local
-  `models/MobileViT/config.json`, `preprocessor_config.json`.
-- **Finding:** The local artifact is MobileViT, with REAL/FAKE class mapping.
-  Use its saved image processor configuration with the image classification model.
-- **Confidence:** confirmed for artifact configuration and documented API.
-- **Security implication:** A model type or successful load does not establish accuracy.
-- **Follow-up:** Calibrate both backends on labeled webcam samples.

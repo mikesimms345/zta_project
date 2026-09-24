@@ -56,15 +56,10 @@ To change evidence thresholds, configure `WINDOW_SIZE` and `FAKE_THRESHOLD`.
 To add identity matching, introduce a separate evidence contract; do not reinterpret
 the REAL media label as an enrolled-identity match.
 
-## CNN / ViT selection
+## CNN model check
 
-The browser sends `{"model": "cnn"}` or `{"model": "vit"}` when creating a
-capture. The server validates the key against its injected classifier registry
-and pins it to that capture. Models are not selected through client file paths
-or shared global mode flags. The default remains CNN for older API clients.
-
-Switching in the UI stops the old capture and clears the displayed evidence.
-The next Start creates a fresh window. In-flight responses from an old capture
-are ignored. ViT failure reports unavailable rather than falling back to CNN.
-`ViTFrameClassifier` uses local MobileViT safetensors and processor configuration
-on CPU, so a CUDA GPU is not required. Both adapters share bounded JPEG validation.
+The application uses one injected CNN classifier. The browser starts a capture
+without a model choice; requests containing a model-selection field are rejected.
+Every new capture has a fresh evidence window. Model failures report unavailable
+without adding evidence. The classifier protocol remains replaceable for tests
+and future CNN upgrades. JPEG validation remains independent of inference.

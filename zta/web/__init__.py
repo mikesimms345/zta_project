@@ -12,13 +12,12 @@ from flask import Flask, jsonify, render_template, request, session
 
 from ..accounts import LocalAccounts
 from ..adapters.tflite import TFLiteFrameClassifier
-from ..adapters.vit import ViTFrameClassifier
 from ..domain import InvalidFrame, ModelUnavailable
 from ..policy import EvidencePolicy
 from ..service import VerificationService, SessionNotFound, CapacityExceeded
 
 
-def create_app(config=None, *, classifier=None, accounts=None, classifiers=None):
+def create_app(config=None, *, classifier=None, accounts=None):
     app = Flask(__name__)
     root = Path(__file__).resolve().parents[2]
     app.config.from_mapping(
@@ -30,20 +29,14 @@ def create_app(config=None, *, classifier=None, accounts=None, classifiers=None)
         PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
         DATABASE=str(root / 'instance' / 'accounts.db'),
         MODEL_PATH=str(root / 'models' / 'lighter_quant_model.tflite'),
-        VIT_MODEL_PATH=str(root / 'models' / 'MobileViT'),
         WINDOW_SIZE=75, FAKE_THRESHOLD=0.70,
     )
     if config:
         app.config.update(config)
     accounts = accounts or LocalAccounts(app.config['DATABASE'])
-    model_registry = classifiers if classifiers is not None else {
-        'cnn': classifier if classifier is not None else TFLiteFrameClassifier(app.config['MODEL_PATH']),
-        'vit': ViTFrameClassifier(app.config['VIT_MODEL_PATH']),
-    }
     service = VerificationService(
-        model_registry['cnn'],
+        classifier if classifier is not None else TFLiteFrameClassifier(app.config['MODEL_PATH']),
         EvidencePolicy(app.config['WINDOW_SIZE'], app.config['FAKE_THRESHOLD']),
-        classifiers=model_registry,
     )
     app.extensions['verification'] = service
     app.extensions['accounts'] = accounts
@@ -112,18 +105,17 @@ def create_app(config=None, *, classifier=None, accounts=None, classifiers=None)
             data = {}
         if not isinstance(data, dict):
             return jsonify(error='Expected a JSON object'), 400
-        model_key = data.get('model', 'cnn')
-        if not isinstance(model_key, str) or model_key not in model_registry:
-            return jsonify(error='Choose CNN or ViT'), 400
+        if 'model' in data:
+            return jsonify(error='Model selection is not supported; this service uses CNN'), 400
         previous = session.get('capture_id')
         if previous:
             try:
                 service.stop(previous, session['capture_owner'])
             except SessionNotFound:
                 pass
-        key = service.start(session['capture_owner'], model_key)
+        key = service.start(session['capture_owner'])
         session['capture_id'] = key
-        return jsonify(capture_id=key, model=model_key), 201
+        return jsonify(capture_id=key), 201
 
     @app.post('/api/captures/<key>/frames')
     @authenticated
