@@ -1,19 +1,14 @@
-# ZTA PAM webcam prototype
-
-Independent extraction from the capstone application, guided by the
-[ZTA PAM project brief](https://github.com/mikesimms345/ZTA_PAM_System/blob/master/docs/brief.md).
+# ZTA PAM System Code
 
 ## Implemented
 
+Small prototype to prove use case.
 Local password accounts, signed-in browser webcam capture, replaceable video
 classification, and per-capture rolling evidence windows. No conference rooms,
 WebRTC signaling, Socket.IO, audio initialization, or peer connections are needed.
 There is no raw-frame storage. Capture windows expire after five minutes.
 
-Media evidence does not establish identity or grant access. SSH is the selected
-future protected resource. SSH credential issuance, authorization, biometric
-identity matching, explicit liveness challenges, and automated requests for
-another check are not implemented. Current results are informational.
+Media evidence does not establish identity or grant access to anything yet.
 
 ## Run locally
 
@@ -25,7 +20,7 @@ folder, the existing `.venv-inference` environment is intended for inference:
 .venv-inference/bin/python -m zta
 ```
 
-The first command prompts for a password (minimum 12 characters). Open
+The first command prompts for a password. Open
 http://127.0.0.1:8083, sign in, and select **Start camera check**. Allow camera
 access in the browser. Microphone access is not requested.
 
@@ -52,7 +47,7 @@ The development server binds to loopback only.
 | `zta/domain.py` | Evidence types and classifier protocol | No Flask, database, or ML imports |
 | `zta/policy.py` | Rolling-window evidence calculation | Pure logic, configurable window and threshold |
 | `zta/service.py` | Capture ownership, expiry, and orchestration | Inject classifier, policy, and clock |
-| `zta/adapters/` | Shared JPEG validation, CNN/TFLite inference | Instance-based, lazy model load; injectable replacements |
+| `zta/adapters/` | Shared JPEG validation, TFLite inference | Instance-based, injectable replacements |
 | `zta/accounts.py` | Local account storage and password checks | Replace with an identity-provider adapter |
 | `zta/web/` | HTTP, signed-in sessions, CSRF, and browser capture | App factory accepts test adapters |
 
@@ -65,11 +60,9 @@ seconds plus inference/network time. Thresholds are inherited, not calibrated.
 ## Provenance and remaining work
 
 `models/` contains the retained model assets copied from the original capstone.
-`SOURCE_MANIFEST.json` records their hashes. The CNN adapter reuses the original
-preprocessing and removes global model state; quantized outputs are dequantized
-before applying the sigmoid threshold. The CNN loads lazily on the first frame.
-Audio assets remain unused. The original capstone application is unchanged.
+The CNN adapter reuses the original preprocessing and removes global model state; 
+quantized outputs are dequantized before applying the sigmoid threshold. 
+The CNN loads lazily on the first frame. Audio assets remain unused. 
+The original capstone application is unchanged.
 
-The GitHub design documents were read on 2026-09-16 and copied under `docs/`.
-Local decisions and session notes extend those copies; nothing was pushed to
-GitHub. See `docs/architecture.md` for integration boundaries and limitations.
+See `docs/architecture.md` for integration boundaries and limitations.
