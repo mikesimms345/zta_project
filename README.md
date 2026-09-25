@@ -12,24 +12,40 @@ Media evidence does not establish identity or grant access to anything yet.
 
 ## Run locally
 
-Use Python 3.12 for the TensorFlow environment tested on this machine. From this
+For a fresh installation:
+
+On Mac:
+```sh
+python3.12 -m venv .venv-inference
+.venv-inference/bin/python -m pip install -r requirements-inference.txt
+```
+
+On Windows:
+```sh
+python -m venv .venv-inference
+.\.venv-inference\Scripts\Activate.ps1
+python -m pip install -r requirements-inference.txt
+```
+
+Use Python 3.12 to ensure compatability. From this
 folder, the existing `.venv-inference` environment is intended for inference:
 
+On Mac:
 ```sh
-.venv-inference/bin/python -m flask --app zta.web:create_app create-user mike
+.venv-inference/bin/python -m flask --app zta.web:create_app create-user (insert name here)
 .venv-inference/bin/python -m zta
+```
+
+On Windows:
+```sh
+python -m flask --app zta.web:create_app create-user (insert name here)
+python -m zta
 ```
 
 The first command prompts for a password. Open
 http://127.0.0.1:8083, sign in, and select **Start camera check**. Allow camera
 access in the browser. Microphone access is not requested.
 
-For a fresh installation:
-
-```sh
-python3.12 -m venv .venv-inference
-.venv-inference/bin/python -m pip install -r requirements-inference.txt
-```
 
 `requirements-macos-py312.lock.txt` records the exact installed versions for
 reproducing this macOS/Python 3.12 environment.
