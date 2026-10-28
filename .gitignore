@@ -5,6 +5,7 @@ instance/
 .env
 *.db
 *.pem
+*.key
 AGENTS.md
 docs/sessions
 .DS_Store

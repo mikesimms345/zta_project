@@ -32,8 +32,8 @@ class Evidence:
 
 
 class FrameClassifier(Protocol):
-    def classify(self, encoded_image: bytes) -> Prediction:
-        """Return media evidence or raise; never fabricate a successful result."""
+    def classify(self, rgb_frame) -> Prediction:
+        """Classify an in-memory RGB frame or raise; never fabricate a result."""
 
 
 class InvalidFrame(ValueError):

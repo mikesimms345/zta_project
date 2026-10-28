@@ -5,17 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf }}">
   <title>ZTA verification prototype</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body><main>
   <h1>ZTA verification prototype</h1>
-  <p>Live webcam media check for the SSH access prototype.</p>
+  <p>Live RGB-D media and depth-liveness check for the SSH access prototype.</p>
   {% if username %}
   <p>Signed in as <strong>{{ username }}</strong>. <button id="logout">Sign out</button></p>
-  <video id="preview" autoplay muted playsinline></video>
   <div><button id="start">Start camera check</button> <button id="stop" disabled>Stop</button></div>
+  <p>The OpenCV window shows RGB and aligned depth side by side. Follow its movement prompt; press Q or Esc there to stop.</p>
   <p id="result">No evidence collected.</p>
-  <p>This checks for synthetic media. It does not establish identity or grant SSH access.</p>
+  <p>These checks produce evidence only. They do not establish identity or grant SSH access.</p>
   {% else %}
   <form id="login">
     <label>Username <input name="username" autocomplete="username" required maxlength="80"></label>

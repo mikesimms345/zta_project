@@ -1,15 +1,16 @@
-"""Video-only instance-based adapter derived from the capstone TFLite path."""
+"""Video classifier backed by Google's LiteRT Python runtime."""
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
 
 from ..domain import Label, ModelUnavailable, Prediction
-from .images import decode_frame
+from .images import validate_rgb_frame
 
 
-class TFLiteFrameClassifier:
-    def __init__(self, model_path):
+class LiteRTFrameClassifier:
+    def __init__(self, model_path, *, interpreter_factory=None):
         self.model_path = Path(model_path)
+        self._interpreter_factory = interpreter_factory
         self._interpreter = None
         self._lock = Lock()
         self._model_id = ""
@@ -18,22 +19,22 @@ class TFLiteFrameClassifier:
         if self._interpreter is not None:
             return
         try:
-            try:
-                from tflite_runtime.interpreter import Interpreter
-            except ImportError:
-                import tensorflow as tf
-                Interpreter = tf.lite.Interpreter
-            interpreter = Interpreter(model_path=str(self.model_path))
+            factory = self._interpreter_factory
+            if factory is None:
+                from ai_edge_litert.interpreter import Interpreter
+                factory = Interpreter
+            interpreter = factory(model_path=str(self.model_path))
             interpreter.allocate_tensors()
             self._model_id = "sha256:" + sha256(self.model_path.read_bytes()).hexdigest()
             self._interpreter = interpreter
         except Exception as exc:
             raise ModelUnavailable("Could not initialize video model") from exc
 
-    def classify(self, encoded_image):
+    def classify(self, rgb_frame):
+        import cv2
         import numpy as np
 
-        image = decode_frame(encoded_image)
+        image = validate_rgb_frame(rgb_frame)
 
         with self._lock:
             self._load()
@@ -48,7 +49,7 @@ class TFLiteFrameClassifier:
                 if not chw and shape[3] != 3:
                     raise ValueError("Expected RGB input")
                 h, w = shape[2:4] if chw else shape[1:3]
-                pixels = np.asarray(image.resize((int(w), int(h))))
+                pixels = cv2.resize(image, (int(w), int(h)), interpolation=cv2.INTER_AREA)
                 # Preserve the original model's input mapping. Its training
                 # preprocessing must be validated separately on labeled samples.
                 if inp['dtype'] == np.uint8:

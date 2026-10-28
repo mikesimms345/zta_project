@@ -60,12 +60,12 @@ class VerificationService:
             raise SessionNotFound("Capture not found or expired")
         return capture
 
-    def submit(self, key, owner, encoded_image):
+    def submit(self, key, owner, rgb_frame):
         # Deliberately serialized for the single-process local harness. A production
         # deployment should inject a durable store and a bounded inference worker.
         with self._lock:
             capture = self._get(key, owner)
-            prediction = self.classifier.classify(encoded_image)
+            prediction = self.classifier.classify(rgb_frame)
             capture = self._get(key, owner)  # inference may outlive the capture TTL
             if not isinstance(prediction.label, Label) or not prediction.model_id:
                 raise ModelUnavailable("Invalid classifier result")

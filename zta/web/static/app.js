@@ -1,13 +1,17 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').content;
 const message = document.querySelector('#message');
-let stream, captureId, timer, running = false, generation = 0;
-const video = document.querySelector('#preview');
 const startButton = document.querySelector('#start');
 const stopButton = document.querySelector('#stop');
+let captureId, events, running = false;
 
 
-async function api(path, method, body, type = 'application/json') {
-  const response = await fetch(path, {method, body, headers: {'X-CSRF-Token': csrf, 'Content-Type': type}});
+async function api(path, method, body) {
+  const options = {method, headers: {'X-CSRF-Token': csrf}};
+  if (body !== undefined) {
+    options.body = body;
+    options.headers['Content-Type'] = 'application/json';
+  }
+  const response = await fetch(path, options);
   const data = response.status === 204 ? {} : await response.json();
   if (!response.ok) throw new Error(data.error || 'Request failed');
   return data;
@@ -22,66 +26,82 @@ document.querySelector('#login')?.addEventListener('submit', async event => {
   } catch (error) { message.textContent = error.message; }
 });
 
+function renderState(state) {
+  const result = document.querySelector('#result');
+  if (state.phase === 'starting') {
+    result.textContent = 'Opening the local camera.';
+    return;
+  }
+  if (state.phase === 'running' && state.sample_count === undefined) {
+    result.textContent = 'RGB-D camera ready; starting inference and liveness.';
+    return;
+  }
+  const summaries = [];
+  if (state.sample_count !== undefined) {
+    const text = {collecting: 'Collecting evidence', flagged: 'Synthetic-media threshold reached',
+      below_threshold: 'Below synthetic-media threshold'};
+    summaries.push(`${text[state.status]} - ${state.sample_count}/${state.window_size} frames, ${Math.round(state.fake_ratio * 100)}% flagged`);
+  }
+  if (state.liveness !== undefined) {
+    const livenessText = {collecting: 'Liveness collecting', live: 'Liveness challenge complete',
+      spoof_suspected: 'Possible presentation attack', unavailable: 'Liveness unavailable'};
+    summaries.push(`${livenessText[state.liveness.status]} - ${state.liveness.instruction}`);
+  }
+  if (summaries.length) result.textContent = `${summaries.join(' | ')}.`;
+  if (state.phase === 'failed') message.textContent = state.error;
+  if (state.phase === 'stopped') message.textContent = 'Camera check stopped.';
+  if (['failed', 'stopped'].includes(state.phase)) {
+    running = false;
+    events?.close();
+    events = null;
+    startButton.disabled = false;
+    stopButton.disabled = true;
+  }
+}
+
+function watchCapture(id) {
+  events?.close();
+  events = new EventSource(`/api/captures/${id}/events`);
+  events.onmessage = event => renderState(JSON.parse(event.data));
+  events.onerror = () => {
+    if (!running) return;
+    message.textContent = 'Lost the camera-status stream.';
+    running = false;
+    events?.close();
+    startButton.disabled = false;
+    stopButton.disabled = true;
+  };
+}
+
 async function stop() {
   running = false;
-  generation++;
-  clearTimeout(timer);
-  stream?.getTracks().forEach(track => track.stop());
-  stream = null;
-  if (video) video.srcObject = null;
+  events?.close();
+  events = null;
   const oldId = captureId;
   captureId = null;
-  if (stopButton) stopButton.disabled = true;
+  stopButton.disabled = true;
   if (oldId) {
     try { await api(`/api/captures/${oldId}`, 'DELETE'); }
     catch (error) { message.textContent = error.message; }
   }
-  if (startButton) startButton.disabled = false;
-}
-
-async function sendFrame(token) {
-  if (!running || token !== generation) return;
-  try {
-    if (video.readyState >= 2) {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-      if (!running || token !== generation) return;
-      if (!blob) throw new Error('Could not capture a frame');
-      const data = await api(`/api/captures/${captureId}/frames`, 'POST', blob, 'image/jpeg');
-      if (!running || token !== generation) return;
-      const text = {collecting: 'Collecting evidence', flagged: 'Synthetic-media threshold reached',
-        below_threshold: 'Below synthetic-media threshold'};
-      document.querySelector('#result').textContent = `${text[data.status]} — ${data.sample_count}/${data.window_size} frames, ${Math.round(data.fake_ratio * 100)}% flagged.`;
-    }
-    // Backpressure: wait for inference before scheduling the next sample.
-    if (running && token === generation) timer = setTimeout(() => sendFrame(token), 200);
-  } catch (error) {
-    if (!running || token !== generation) return;
-    message.textContent = error.message;
-    document.querySelector('#result').textContent = 'Check interrupted; current result unavailable.';
-    await stop();
-  }
+  startButton.disabled = false;
 }
 
 startButton?.addEventListener('click', async () => {
   startButton.disabled = true;
   message.textContent = '';
-  document.querySelector('#result').textContent = 'No evidence collected.';
+  document.querySelector('#result').textContent = 'Starting camera check.';
   try {
-    stream = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 640}, height: {ideal: 480}}, audio: false});
-    video.srcObject = stream;
-    await video.play();
     captureId = (await api('/api/captures', 'POST')).capture_id;
     running = true;
     stopButton.disabled = false;
-    const token = ++generation;
-    stream.getVideoTracks()[0].addEventListener('ended', () => { void stop(); });
-    void sendFrame(token);
-  } catch (error) { message.textContent = error.message; await stop(); }
+    watchCapture(captureId);
+  } catch (error) {
+    message.textContent = error.message;
+    startButton.disabled = false;
+  }
 });
+
 stopButton?.addEventListener('click', () => { void stop(); });
 document.querySelector('#logout')?.addEventListener('click', async () => {
   await stop();
@@ -89,6 +109,10 @@ document.querySelector('#logout')?.addEventListener('click', async () => {
   catch (error) { message.textContent = error.message; }
 });
 window.addEventListener('pagehide', () => {
-  running = false;
-  stream?.getTracks().forEach(track => track.stop());
+  events?.close();
+  if (captureId) {
+    void fetch(`/api/captures/${captureId}`, {
+      method: 'DELETE', keepalive: true, headers: {'X-CSRF-Token': csrf},
+    });
+  }
 });

@@ -19,4 +19,5 @@ Capture ideas before they are validated. Link supporting evidence when it exists
 - **Why it may work:** Bind a short-lived evidence record to an authenticated access request.
 - **Security assumptions and risks:** Browser media can be forged/replayed; a REAL
   classification does not establish identity. Credential issuance needs independent policy.
-- **Next validation step:** Specify identity/liveness requirements and adversarial test cases.
+- **Next validation step:** Specify identity requirements and validate the implemented
+  depth-liveness signal against the documented adversarial cases.

@@ -1,28 +1,27 @@
 """Flask transport adapter and composition root for the local prototype."""
-from dataclasses import asdict
 from datetime import timedelta
 from functools import wraps
 import hmac
+import json
 import os
 from pathlib import Path
 import secrets
 
 import click
-from flask import Flask, jsonify, render_template, request, session
+from flask import Flask, Response, jsonify, render_template, request, session, stream_with_context
 
 from ..accounts import LocalAccounts
-from ..adapters.tflite import TFLiteFrameClassifier
-from ..domain import InvalidFrame, ModelUnavailable
+from ..adapters.litert import LiteRTFrameClassifier
+from ..camera import CameraBusy, CameraRunNotFound, RGBDCameraPipeline, TERMINAL_PHASES
 from ..policy import EvidencePolicy
 from ..service import VerificationService, SessionNotFound, CapacityExceeded
 
 
-def create_app(config=None, *, classifier=None, accounts=None):
+def create_app(config=None, *, classifier=None, accounts=None, capture_pipeline=None):
     app = Flask(__name__)
     root = Path(__file__).resolve().parents[2]
     app.config.from_mapping(
         SECRET_KEY=os.environ.get('ZTA_SECRET_KEY') or secrets.token_hex(32),
-        MAX_CONTENT_LENGTH=512 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Strict',
         SESSION_COOKIE_SECURE=os.environ.get('ZTA_SECURE_COOKIES') == '1',
@@ -30,16 +29,25 @@ def create_app(config=None, *, classifier=None, accounts=None):
         DATABASE=str(root / 'instance' / 'accounts.db'),
         MODEL_PATH=str(root / 'models' / 'lighter_quant_model.tflite'),
         WINDOW_SIZE=75, FAKE_THRESHOLD=0.70,
+        REALSENSE_SERIAL=os.environ.get('ZTA_REALSENSE_SERIAL'),
+        SAMPLE_INTERVAL=0.2, CAMERA_PREVIEW=True,
     )
     if config:
         app.config.update(config)
     accounts = accounts or LocalAccounts(app.config['DATABASE'])
     service = VerificationService(
-        classifier if classifier is not None else TFLiteFrameClassifier(app.config['MODEL_PATH']),
+        classifier if classifier is not None else LiteRTFrameClassifier(app.config['MODEL_PATH']),
         EvidencePolicy(app.config['WINDOW_SIZE'], app.config['FAKE_THRESHOLD']),
+    )
+    capture_pipeline = capture_pipeline or RGBDCameraPipeline(
+        service.submit,
+        device_serial=app.config['REALSENSE_SERIAL'],
+        sample_interval=app.config['SAMPLE_INTERVAL'],
+        preview=app.config['CAMERA_PREVIEW'],
     )
     app.extensions['verification'] = service
     app.extensions['accounts'] = accounts
+    app.extensions['capture_pipeline'] = capture_pipeline
 
     @app.before_request
     def csrf_protection():
@@ -56,7 +64,7 @@ def create_app(config=None, *, classifier=None, accounts=None):
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
-        response.headers['Permissions-Policy'] = 'camera=(self), microphone=()'
+        response.headers['Permissions-Policy'] = 'camera=(), microphone=()'
         return response
 
     def authenticated(fn):
@@ -91,6 +99,10 @@ def create_app(config=None, *, classifier=None, accounts=None):
         key = session.get('capture_id')
         if key:
             try:
+                capture_pipeline.stop(key, session['capture_owner'])
+            except CameraRunNotFound:
+                pass
+            try:
                 service.stop(key, session['capture_owner'])
             except SessionNotFound:
                 pass
@@ -110,52 +122,73 @@ def create_app(config=None, *, classifier=None, accounts=None):
         previous = session.get('capture_id')
         if previous:
             try:
+                capture_pipeline.stop(previous, session['capture_owner'])
+            except CameraRunNotFound:
+                pass
+            try:
                 service.stop(previous, session['capture_owner'])
             except SessionNotFound:
                 pass
         key = service.start(session['capture_owner'])
+        try:
+            capture_pipeline.start(key, session['capture_owner'])
+        except Exception:
+            service.stop(key, session['capture_owner'])
+            raise
         session['capture_id'] = key
         return jsonify(capture_id=key), 201
 
-    @app.post('/api/captures/<key>/frames')
+    @app.get('/api/captures/<key>/events')
     @authenticated
-    def frame(key):
-        if request.mimetype != 'image/jpeg':
-            return jsonify(error='Expected image/jpeg'), 415
-        encoded = request.get_data()
-        if not encoded:
-            return jsonify(error='Empty frame'), 400
-        evidence = service.submit(key, session['capture_owner'], encoded)
-        return jsonify(asdict(evidence))
+    def capture_events(key):
+        owner = session['capture_owner']
+
+        @stream_with_context
+        def generate():
+            version = -1
+            while True:
+                previous = version
+                try:
+                    version, state = capture_pipeline.wait_for_update(key, owner, version)
+                except CameraRunNotFound:
+                    return
+                if version == previous:
+                    yield ': keep-alive\n\n'
+                    continue
+                yield f"data: {json.dumps(state)}\n\n"
+                if state['phase'] in TERMINAL_PHASES:
+                    return
+
+        return Response(generate(), mimetype='text/event-stream')
 
     @app.delete('/api/captures/<key>')
     @authenticated
     def stop(key):
-        service.stop(key, session['capture_owner'])
+        owner = session['capture_owner']
+        try:
+            capture_pipeline.stop(key, owner)
+        except CameraRunNotFound:
+            pass
+        service.stop(key, owner)
         if session.get('capture_id') == key:
             session.pop('capture_id')
         return '', 204
-
-    @app.errorhandler(InvalidFrame)
-    def invalid_frame(exc):
-        return jsonify(error=str(exc)), 400
-
-    @app.errorhandler(ModelUnavailable)
-    def unavailable(exc):
-        app.logger.exception('Model unavailable')
-        return jsonify(error='Video model unavailable; no evidence recorded'), 503
 
     @app.errorhandler(SessionNotFound)
     def missing(exc):
         return jsonify(error=str(exc)), 404
 
+    @app.errorhandler(CameraRunNotFound)
+    def missing_camera_run(exc):
+        return jsonify(error=str(exc)), 404
+
+    @app.errorhandler(CameraBusy)
+    def busy_camera(exc):
+        return jsonify(error=str(exc)), 409
+
     @app.errorhandler(CapacityExceeded)
     def capacity(exc):
         return jsonify(error=str(exc)), 429
-
-    @app.errorhandler(413)
-    def oversized(exc):
-        return jsonify(error='Frame exceeds 512 KiB'), 413
 
     @app.cli.command('create-user')
     @click.argument('username')

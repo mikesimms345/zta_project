@@ -11,11 +11,12 @@ Track questions that need evidence, a decision, or an assigned owner.
 
 - Prototype identity source: local username/password accounts (decided by Mike).
 - First protected resource: SSH access (decided by Mike); enforcement is future work.
-- Input: live webcam video. Failed checks should eventually request another check;
+- Input: live Intel RealSense D435 RGB-D frames. Failed checks should eventually request another check;
   implementation is deferred.
 - Define allowed SSH hosts, OS principals, access durations, and approvals.
 - Choose SSH certificate issuance or brokered sessions and establish key custody.
-- Decide whether identity matching and an explicit liveness challenge are required.
+- Calibrate the implemented depth-liveness thresholds and movement challenge on
+  labeled live, print, display, mask, and injected-frame attacks.
 - Validate detector preprocessing/class mapping and calibrate thresholds on labeled
   real and synthetic samples before using results in an access policy.
 - Define recheck limits, expiry, terminal outcomes, and audit retention later.
