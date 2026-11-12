@@ -16,9 +16,31 @@ Media evidence does not establish identity or grant access to anything yet.
 
 For a fresh installation:
 
+Python <3.11 REQUIRED.
+
+For installing Python 3.10 on a fresh install, run:
+
+```sh
+sudo apt update
+sudo apt install -y git curl build-essential libssl-dev zlib1g-dev \
+  libbz2-dev libreadline-dev libsqlite3-dev libncurses-dev \
+  xz-utils tk-dev libffi-dev liblzma-dev
+
+git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+~/.pyenv/bin/pyenv install -s 3.10
+
+cd ~/zta_project
+~/.pyenv/bin/pyenv local 3.10
+~/.pyenv/bin/pyenv exec python -m venv .venv-py310
+
+source .venv-py310/bin/activate
+```
+
+Change the environment for the later instructions as appropriate.
+
 On Mac:
 ```sh
-python3.12 -m venv .venv-inference
+python3 -m venv .<environment-name>
 .venv-inference/bin/python -m pip install -r requirements-inference.txt
 ```
 
