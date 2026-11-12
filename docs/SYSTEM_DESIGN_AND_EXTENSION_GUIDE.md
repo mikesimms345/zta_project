@@ -78,7 +78,7 @@ flowchart TD
     Web --> Result[Informational browser result]
 ```
 
-The validator is called by the classifier adapter; the diagram shows data flow rather than direct Python imports. `domain.py` defines the shared result types used by the service, classifier, and policy.
+The validator is called by the classifier adapter; the diagram shows data flow rather than direct Python imports. `deepfake-detection/domain.py` defines the shared result types used by the service, classifier, and policy.
 
 The key boundaries are:
 
@@ -100,23 +100,22 @@ Paths in this section are relative to the project root.
 | --- | --- | --- |
 | `zta/__main__.py` | `create_app()` invocation | Starts the development server on `127.0.0.1:8083`, without debug mode |
 | `zta/__init__.py` | Package marker | Defines the application package |
-| `zta/domain.py` | `Label`, `Status`, `Prediction`, `Evidence`, `FrameClassifier` | Framework-independent data contracts; add distinct future evidence contracts rather than overloading media labels |
-| `zta/policy.py` | `EvidencePolicy` | Validates evidence settings and calculates rolling media statistics; keep access authorization elsewhere |
-| `zta/service.py` | `VerificationService`, `CaptureSession` | Owns capture IDs, ownership checks, lifetime, capacity, classifier calls, and evidence windows |
-| `zta/media.py` | `RGBDFrame`, `CameraIntrinsics`, `RGBDFrameSource` | SDK-free synchronized-frame contracts shared by capture, liveness, and preview code |
-| `zta/camera.py` | `RGBDCameraPipeline` | Owns the local worker, routes RGB-D frames, coordinates independent evidence, and publishes state updates |
-| `zta/adapters/realsense.py` | `RealSenseFrameSource` | Sole `pyrealsense2` owner; configures, aligns, converts, and releases D435 streams |
-| `zta/adapters/images.py` | `validate_rgb_frame()` | Validates in-memory RGB array type, shape, and pixel-area bound |
-| `zta/adapters/litert.py` | `LiteRTFrameClassifier` | Lazily loads the CNN with LiteRT, preprocesses input, serializes interpreter use, and translates output into a prediction |
+| `zta/deepfake-detection/domain.py` | `Label`, `Status`, `Prediction`, `Evidence`, `FrameClassifier` | Framework-independent data contracts; add distinct future evidence contracts rather than overloading media labels |
+| `zta/deepfake-detection/policy.py` | `EvidencePolicy` | Validates evidence settings and calculates rolling media statistics; keep access authorization elsewhere |
+| `zta/deepfake-detection/cnn-service.py` | `VerificationService`, `CaptureSession` | Owns capture IDs, ownership checks, lifetime, capacity, classifier calls, and evidence windows; imported through `importlib.import_module` because the package and filename contain hyphens |
+| `zta/frame-handler.py` | `RGBDFrame`, `CameraIntrinsics`, `RGBDFrameSource`, `RGBDCameraPipeline` | Defines SDK-free synchronized-frame contracts, owns the local worker, routes RGB-D frames, coordinates independent evidence, and publishes state updates; imported through `importlib.import_module` because the filename contains a hyphen |
+| `zta/realsense.py` | `RealSenseFrameSource` | Sole `pyrealsense2` owner; configures, aligns, converts, and releases D435 streams |
+| `zta/deepfake-detection/images.py` | `validate_rgb_frame()` | Validates in-memory RGB array type, shape, and pixel-area bound |
+| `zta/deepfake-detection/litert.py` | `LiteRTFrameClassifier` | Lazily loads the CNN with LiteRT, preprocesses input, serializes interpreter use, and translates output into a prediction |
 | `zta/liveness/depth.py` | `DepthLivenessAnalyzer` | Detects a face and measures aligned-depth coverage, distance, and residual non-planar relief |
 | `zta/liveness/policy.py` | `DepthLivenessPolicy` | Aggregates observations, tracks the movement challenge, and reports liveness status |
 | `zta/preview.py` | `SideBySidePreviewRenderer` | Composes RGB/LiteRT and colorized depth/liveness panels in one OpenCV window |
-| `zta/adapters/__init__.py` | Package marker | Groups replaceable external/runtime adapters |
+| `zta/deepfake-detection/__init__.py` | Package marker | Groups deepfake detection contracts, validation, inference, and evidence coordination |
 | `zta/accounts.py` | `LocalAccounts` | Creates/checks local accounts using SQLite and Werkzeug password hashing |
 | `zta/web/__init__.py` | `create_app()` and route handlers | Constructs dependencies; implements HTTP routes, signed session cookies, CSRF, error mapping, and account CLI |
 | `zta/web/templates/index.html` | Login and RGB-D status page | Displays login or signed-in capture controls |
 | `zta/web/static/app.js` | `api()`, `watchCapture()`, `stop()`, event handlers | Starts/stops checks and displays server-sent state; it does not access camera frames |
-| `tests/test_camera.py` | Injected RGB-D worker test | Verifies both evidence paths continue after a full media window and source/preview release on stop |
+| RGB-D worker tests (source absent from this checkout) | Injected RGB-D worker test | Documented checks cover both evidence paths continuing after a full media window and source/preview release on stop |
 | `tests/test_litert.py` | Injected LiteRT interpreter test | Verifies lazy loading, reuse, quantized output handling, and model identity without loading the native runtime |
 | `tests/test_liveness.py` | Synthetic depth and policy tests | Verifies planar/curved classification, movement completion, and repeated-planar handling |
 | `tests/test_preview.py` | Synthetic RGB-D preview test | Verifies one side-by-side image has the expected dimensions |
@@ -283,10 +282,15 @@ The following is a **proposed** structure; new paths are not yet implemented:
 
 ```text
 zta/
-  domain.py                    shared types; extend or split as contracts grow
-  service.py                   existing CNN capture workflow
-  policy.py                    existing media evidence calculation
-  adapters/                    existing CNN and image decoder
+  deepfake-detection/
+    __init__.py                existing detection package
+    domain.py                  shared CNN result and classifier contracts
+    cnn-service.py             existing CNN capture workflow
+    policy.py                  existing media evidence calculation
+    images.py                  existing RGB validation
+    litert.py                  existing CNN runtime adapter
+  frame-handler.py             existing RGB-D frame contracts and coordination
+  realsense.py                 existing RealSense source
   accounts.py                  existing prototype account adapter
   access/
     service.py                 coordinates the complete privileged-access request
@@ -393,7 +397,7 @@ A proposed challenge record should reference the immutable request and accepted 
 
 ## 10. Authorization and SSH access
 
-`authorization/policy.py` should be a pure decision function over authenticated identity, evidence, resource policy, and approval state. `zta/policy.py` remains the CNN-window calculator.
+`authorization/policy.py` should be a pure decision function over authenticated identity, evidence, resource policy, and approval state. `zta/deepfake-detection/policy.py` remains the CNN-window calculator.
 
 Suggested outcomes are `allow`, `deny`, `recheck_required`, and `unavailable`. Missing, expired, mismatched, or errored evidence cannot yield an allow decision. A recheck is a new bounded attempt, not automatic approval or an endless retry loop. Retry policy remains deferred.
 

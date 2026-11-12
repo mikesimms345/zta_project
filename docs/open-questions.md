@@ -1,5 +1,10 @@
 # Open questions
 
+- macOS RealSense capture is blocked: 2.56.5 crashes after libusb device-access
+  denial on macOS 26.5.1; 2.54.2 reports no device. Next action: select a
+  Windows/Linux capture host or validate an entitled macOS SDK/camera process
+  without granting root to Flask. Owner: Mike; status: Open.
+
 Track questions that need evidence, a decision, or an assigned owner.
 
 | Question | Why it matters | Next action | Owner | Status |

@@ -1,7 +1,12 @@
 """Intel RealSense RGB-D source; SDK objects do not cross this boundary."""
+from importlib import import_module
 from time import monotonic
 
-from ..media import CameraIntrinsics, RGBDFrame
+
+# The frame types live in a module with a hyphenated filename.
+_frame_handler = import_module('.frame-handler', __package__)
+CameraIntrinsics = _frame_handler.CameraIntrinsics
+RGBDFrame = _frame_handler.RGBDFrame
 
 
 class RealSenseFrameSource:

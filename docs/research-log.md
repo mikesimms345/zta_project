@@ -1,5 +1,37 @@
 # Research log
 
+### 2026-11-12 — macOS RealSense stream startup crash
+
+- **Sources:** https://github.com/cansik/pyrealsense2-macosx/issues/14 and
+  https://raw.githubusercontent.com/realsenseai/librealsense/v2.56.5/src/libusb/context-libusb.cpp
+- **Finding:** Local crash-report stack identifies `pipeline.start` through
+  librealsense USB enumeration to `libusb_get_device_list` and a null-adjacent
+  mutex access. Standalone main-thread and worker-thread captures both reproduced
+  SIGSEGV with 2.56.5. LIBUSB_DEBUG=2 reported device capture requires entitlement
+  `com.apple.vm.device-access` or root, followed by unreleased device references,
+  failed libusb initialization, and SIGSEGV. SDK source continues enumeration
+  after initialization failure. Flask, inference, and preview are not needed to
+  reproduce this startup failure. Isolated 2.54.2 returned `No device connected`.
+- **Confidence:** confirmed for local reproductions and logged sequence; a
+  working entitled macOS camera configuration remains unverified.
+- **Security implication:** Do not elevate the entire Flask application to root.
+- **Follow-up:** Use a Windows/Linux camera host, or validate an entitled macOS
+  SDK and separately scoped camera execution design before claiming support.
+
+### 2026-11-12 — RealSense macOS package selection
+
+- **Source:** https://github.com/cansik/pyrealsense2-macosx and
+  https://pypi.org/project/pyrealsense2-macosx/
+- **Finding:** The official requirement failed to resolve on this Apple Silicon
+  Python 3.12 environment. The community package 2.56.5 publishes a CPython 3.12
+  arm64 wheel for macOS 15+, with the `pyrealsense2` import. This host meets those
+  platform requirements. Requirements now select that pinned package on Darwin.
+- **Confidence:** confirmed for published wheel metadata; hardware operation is
+  unverified on this Mac.
+- **Security implication:** macOS uses a community-built SDK distribution;
+  successful installation does not establish device integrity or liveness.
+- **Follow-up:** Verify import and test D435 acquisition and preview on this host.
+
 Use one entry per meaningful finding.
 
 ## Template
@@ -110,8 +142,8 @@ Use one entry per meaningful finding.
 
 - **Question:** Should this RGB-D layer output the project-note biometric hash,
   which source should provide the feature vector, and where should that output go?
-- **Source:** Current contracts and flow in `zta/domain.py`,
-  `zta/liveness/domain.py`, `zta/camera.py`, and `zta/web/__init__.py`; the
+- **Source:** Current contracts and flow in `zta/deepfake-detection/domain.py`,
+  `zta/liveness/domain.py`, `zta/frame-handler.py`, and `zta/web/__init__.py`; the
   proposed architecture in `docs/SYSTEM_DESIGN_AND_EXTENSION_GUIDE.md`; W3C
   WebAuthn Level 3 https://www.w3.org/TR/webauthn-3/; NIST SP 800-63B-4
   https://pages.nist.gov/800-63-4/sp800-63b.html; and FIDO authentication and

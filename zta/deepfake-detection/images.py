@@ -1,7 +1,7 @@
 """Validation for in-memory RGB frames supplied by the Python camera pipeline."""
 import numpy as np
 
-from ..domain import InvalidFrame
+from .domain import InvalidFrame
 
 
 def validate_rgb_frame(frame):

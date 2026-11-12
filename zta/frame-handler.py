@@ -1,17 +1,52 @@
-"""Python-owned RGB-D capture, inference coordination, and result delivery."""
+"""RGB-D frame contracts, inference coordination, and result delivery."""
 from dataclasses import asdict, dataclass
+from importlib import import_module
 import logging
 from threading import Condition, Event, RLock, Thread
 from time import monotonic
+from typing import Protocol
 
-from .adapters.realsense import RealSenseFrameSource
-from .domain import ModelUnavailable
 from .liveness import DepthLivenessAnalyzer, DepthLivenessPolicy
 from .preview import SideBySidePreviewRenderer
 
 
+ModelUnavailable = import_module('.deepfake-detection.domain', __package__).ModelUnavailable
 LOG = logging.getLogger(__name__)
 TERMINAL_PHASES = frozenset({"failed", "stopped"})
+
+
+@dataclass(frozen=True)
+class CameraIntrinsics:
+    width: int
+    height: int
+    fx: float
+    fy: float
+    ppx: float
+    ppy: float
+    distortion_model: str
+    coefficients: tuple
+
+
+@dataclass(frozen=True)
+class RGBDFrame:
+    color_bgr: object
+    color_rgb: object
+    aligned_depth: object
+    depth_scale: float
+    intrinsics: CameraIntrinsics
+    frame_number: int
+    captured_at: float
+
+
+class RGBDFrameSource(Protocol):
+    def start(self):
+        """Acquire the RGB-D device."""
+
+    def read(self) -> RGBDFrame:
+        """Return one synchronized color/depth frameset."""
+
+    def stop(self):
+        """Release the device."""
 
 
 class CameraBusy(RuntimeError):
@@ -48,9 +83,7 @@ class RGBDCameraPipeline:
         self.sample_interval = sample_interval
         self.preview = preview
         self.clock = clock
-        self._source_factory = source_factory or (
-            lambda: RealSenseFrameSource(serial=self.device_serial)
-        )
+        self._source_factory = source_factory or self._create_realsense_source
         self._liveness_analyzer = liveness_analyzer or DepthLivenessAnalyzer()
         self._liveness_policy_factory = (
             liveness_policy_factory or DepthLivenessPolicy
@@ -59,6 +92,12 @@ class RGBDCameraPipeline:
         self._runs = {}
         self._lock = RLock()
         self._changed = Condition(self._lock)
+
+    def _create_realsense_source(self):
+        # The adapter imports our frame types; defer its import to avoid a cycle.
+        from .realsense import RealSenseFrameSource
+
+        return RealSenseFrameSource(serial=self.device_serial)
 
     def _get(self, key, owner):
         run = self._runs.get(key)

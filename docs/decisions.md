@@ -1,5 +1,53 @@
 # Decision log
 
+### 2026-11-12 — Group the deepfake detection workflow
+
+- **Status:** decided
+- **Decision:** Group the CNN domain contracts, service, policy, image validation,
+  and LiteRT classifier in `zta/deepfake-detection/`. Place the RealSense camera
+  source at `zta/realsense.py`. Use `importlib.import_module` at the hyphenated
+  package boundary and ordinary relative imports within the detection package.
+- **Why:** Mike requested a directory layout that groups the deepfake detection
+  workflow and keeps the camera source alongside the frame handler.
+- **Security impact:** Model failures must retain the same exception identity
+  across the classifier, service, and frame handler. Capture ownership, expiry,
+  and distinct media/liveness evidence remain the existing requirements.
+- **Alternatives considered:** Keeping a generic adapter directory or root-level
+  CNN service and policy would not match the requested grouping.
+- **Consequences / next steps:** Verify imports from each public entry point,
+  injected inference, source conversion, Flask lifecycle, and worker cleanup.
+
+### 2026-11-12 — Consolidate RGB-D frame contracts with the frame handler
+
+- **Status:** decided
+- **Decision:** Define `CameraIntrinsics`, `RGBDFrame`, and `RGBDFrameSource` in
+  `zta/frame-handler.py` alongside the worker. The RealSense adapter imports these
+  types with `importlib.import_module`; the worker imports its default adapter
+  when creating a source to avoid a circular import.
+- **Why:** Mike requested one module for frame contracts and frame handling to
+  simplify the project structure.
+- **Security impact:** Frame data remains transient and media/liveness evidence
+  remains separate. The adapter now depends on the frame-handler module.
+- **Alternatives considered:** Keeping a separate frame-contract module would
+  preserve a smaller dependency boundary but would not meet the requested
+  consolidation. Eager imports in both modules would create an import cycle.
+- **Consequences / next steps:** Verify both import orders, RealSense frame
+  conversion, Flask construction, and injected worker lifecycle behavior.
+
+### 2026-11-12 — Platform-specific RealSense distribution
+
+- **Status:** decided
+- **Decision:** Pin community `pyrealsense2-macosx==2.56.5` on Darwin;
+  retain official `pyrealsense2>=2.58.4,<3` elsewhere.
+- **Why:** The official requirement cannot resolve on the target Mac; the
+  community distribution publishes a matching Python 3.12 Apple Silicon wheel.
+- **Security impact:** macOS adds a community binary supplier. No hardware or
+  security property follows from package installation.
+- **Alternatives considered:** Building the official SDK from source adds local
+  toolchain and maintenance work; dropping depth would change the prototype.
+- **Consequences / next steps:** Document macOS 15+ and arm64 support; validate
+  physical D435 behavior with this older SDK before relying on its results.
+
 Record decisions that change project direction, architecture, threat exposure, or implementation.
 
 ## Template

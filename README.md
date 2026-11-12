@@ -22,6 +22,25 @@ python3.12 -m venv .venv-inference
 .venv-inference/bin/python -m pip install -r requirements-inference.txt
 ```
 
+The macOS dependency uses the community-maintained
+[`pyrealsense2-macosx`](https://github.com/cansik/pyrealsense2-macosx)
+2.56.5 build, which provides the same `import pyrealsense2` module. Its wheel
+requires Apple Silicon and macOS 15 or later. Other Mac configurations need a
+separately built compatible SDK; these commands do not cover them. Windows/Linux
+use the official `pyrealsense2` package. Verify the import before starting:
+
+```sh
+.venv-inference/bin/python -c "import pyrealsense2 as rs; print(rs.pipeline)"
+```
+
+Import success does not verify camera access or RGB-D behavior on macOS.
+On the tested macOS 26.5.1 host, this build crashes at stream startup after
+libusb reports that USB device capture requires the `com.apple.vm.device-access`
+entitlement or root privilege. Installation is verified; macOS capture is currently
+blocked. Do not run the Flask web server as root to work around this. Use a
+Windows/Linux capture host or resolve the SDK's macOS device-access requirements
+with a separately reviewed camera execution design.
+
 On Windows:
 ```sh
 py -3.12 -m venv .venv-inference
@@ -87,16 +106,23 @@ The development server binds to loopback only.
 
 | Module | Responsibility | Replace or test independently |
 | --- | --- | --- |
-| `zta/domain.py` | Media evidence types and classifier protocol | No Flask, database, or ML imports |
-| `zta/media.py` | Synchronized RGB-D frame and source contracts | No RealSense SDK dependency |
-| `zta/policy.py` | Rolling-window evidence calculation | Pure logic, configurable window and threshold |
-| `zta/service.py` | Capture ownership, expiry, and orchestration | Inject classifier, policy, and clock |
-| `zta/camera.py` | RGB-D coordination, sampling, status lifecycle | One Python-owned local camera worker |
-| `zta/adapters/` | RealSense capture, RGB validation, LiteRT inference | SDK/runtime boundaries are injectable |
+| `zta/deepfake-detection/domain.py` | Media evidence types and classifier protocol | No Flask, database, or ML imports |
+| `zta/deepfake-detection/policy.py` | Rolling-window evidence calculation | Pure logic, configurable window and threshold |
+| `zta/deepfake-detection/cnn-service.py` | CNN capture ownership, expiry, and orchestration | Inject classifier, policy, and clock |
+| `zta/frame-handler.py` | RGB-D frame/source contracts, coordination, sampling, status lifecycle | Shared frame types and one Python-owned local camera worker |
+| `zta/realsense.py` | RealSense RGB-D capture, alignment, and conversion | Camera SDK boundary is injectable |
+| `zta/deepfake-detection/` | RGB validation and LiteRT inference alongside CNN contracts and policy | Classifier/runtime boundaries are injectable |
 | `zta/liveness/` | Depth geometry observations and temporal challenge policy | Independent from CNN media labels |
 | `zta/preview.py` | Side-by-side RGB and aligned-depth rendering | Presentation only; no evidence decisions |
 | `zta/accounts.py` | Local account storage and password checks | Replace with an identity-provider adapter |
 | `zta/web/` | HTTP, signed-in sessions, CSRF, controls, and status events | App factory accepts test adapters |
+
+The hyphenated `zta/deepfake-detection/` package and `zta/frame-handler.py` module
+are loaded with `importlib.import_module` in `zta/web/__init__.py`. Modules within
+the detection package use relative imports for their shared contracts and policy.
+`zta/realsense.py` also loads the frame handler through `importlib` to use its
+shared frame types. The frame handler imports its default RealSense source when
+the worker creates the source, avoiding a circular import.
 
 This is a modular single-process application. Session storage is bounded and
 in-memory; a durable store/worker boundary is required before multi-worker use.

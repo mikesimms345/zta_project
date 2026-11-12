@@ -11,6 +11,12 @@ model version. Evidence policy produces `collecting`, `flagged`, or
 `below_threshold`, never an authorization decision. Account identity and future
 SSH actions do not belong inside inference code.
 
+`zta/deepfake-detection/` contains the CNN contracts, RGB validation, LiteRT
+classifier, CNN service, and rolling-window policy. `zta/realsense.py` owns camera
+capture at the top level of the package, alongside `zta/frame-handler.py`.
+Code outside the detection package loads its modules with `importlib.import_module`
+because the package name contains a hyphen.
+
 Keeping these as Python modules initially makes tests and deployment simple.
 Independent services can be introduced later if scaling requires them; doing so
 now would add network contracts and distributed state without a demonstrated need.
@@ -104,6 +110,11 @@ contract; do not reinterpret the `real` media label as an enrolled-identity matc
 Depth `live` evidence is likewise separate from identity matching and authorization.
 
 ## Depth-liveness check
+
+`zta/frame-handler.py` defines `CameraIntrinsics`, `RGBDFrame`, and the
+`RGBDFrameSource` interface alongside the camera worker. The RealSense adapter
+imports these shared types through `importlib.import_module`. The worker imports
+its default RealSense adapter when creating the source to avoid a circular import.
 
 `RealSenseFrameSource` is the only RealSense SDK owner. It requests synchronized
 640x480 color and depth at 30 fps, aligns depth to color, and returns an SDK-free

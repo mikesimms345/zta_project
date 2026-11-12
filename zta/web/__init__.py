@@ -1,6 +1,7 @@
 """Flask transport adapter and composition root for the local prototype."""
 from datetime import timedelta
 from functools import wraps
+from importlib import import_module
 import hmac
 import json
 import os
@@ -11,10 +12,25 @@ import click
 from flask import Flask, Response, jsonify, render_template, request, session, stream_with_context
 
 from ..accounts import LocalAccounts
-from ..adapters.litert import LiteRTFrameClassifier
-from ..camera import CameraBusy, CameraRunNotFound, RGBDCameraPipeline, TERMINAL_PHASES
-from ..policy import EvidencePolicy
-from ..service import VerificationService, SessionNotFound, CapacityExceeded
+
+
+# Hyphenated package and module names require importlib rather than a from-import.
+_litert = import_module('..deepfake-detection.litert', __package__)
+LiteRTFrameClassifier = _litert.LiteRTFrameClassifier
+
+_policy = import_module('..deepfake-detection.policy', __package__)
+EvidencePolicy = _policy.EvidencePolicy
+
+_cnn_service = import_module('..deepfake-detection.cnn-service', __package__)
+VerificationService = _cnn_service.VerificationService
+SessionNotFound = _cnn_service.SessionNotFound
+CapacityExceeded = _cnn_service.CapacityExceeded
+
+_frame_handler = import_module('..frame-handler', __package__)
+CameraBusy = _frame_handler.CameraBusy
+CameraRunNotFound = _frame_handler.CameraRunNotFound
+RGBDCameraPipeline = _frame_handler.RGBDCameraPipeline
+TERMINAL_PHASES = _frame_handler.TERMINAL_PHASES
 
 
 def create_app(config=None, *, classifier=None, accounts=None, capture_pipeline=None):

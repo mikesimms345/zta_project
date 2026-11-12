@@ -1,4 +1,4 @@
-"""Application orchestration with expiring per-capture state."""
+"""CNN evidence orchestration with expiring per-capture state."""
 from dataclasses import dataclass
 from threading import RLock
 from time import monotonic

@@ -3,7 +3,7 @@ from hashlib import sha256
 from pathlib import Path
 from threading import Lock
 
-from ..domain import Label, ModelUnavailable, Prediction
+from .domain import Label, ModelUnavailable, Prediction
 from .images import validate_rgb_frame
 
 
