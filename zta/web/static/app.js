@@ -32,7 +32,7 @@ function renderState(state) {
     result.textContent = 'Opening the local camera.';
     return;
   }
-  if (state.phase === 'running' && state.sample_count === undefined) {
+  if (state.phase === 'running' && state.sample_count === undefined && state.rppg === undefined) {
     result.textContent = 'RGB-D camera ready; starting inference and liveness.';
     return;
   }
@@ -47,10 +47,19 @@ function renderState(state) {
       spoof_suspected: 'Possible presentation attack', unavailable: 'Liveness unavailable'};
     summaries.push(`${livenessText[state.liveness.status]} - ${state.liveness.instruction}`);
   }
+  if (state.rppg !== undefined) {
+    const pulseText = {collecting: 'Collecting pulse evidence', signal_detected: 'Pulse signal detected',
+      inconclusive: 'Pulse evidence inconclusive', unavailable: 'Pulse evidence unavailable'};
+    const rate = state.rppg.bpm === null ? '' : `, approximately ${Math.round(state.rppg.bpm)} BPM`;
+    summaries.push(`${pulseText[state.rppg.status]} - ${state.rppg.duration_seconds.toFixed(1)}s${rate}. ${state.rppg.instruction}`);
+  }
   if (summaries.length) result.textContent = `${summaries.join(' | ')}.`;
   if (state.phase === 'failed') message.textContent = state.error;
   if (state.phase === 'stopped') message.textContent = 'Camera check stopped.';
-  if (['failed', 'stopped'].includes(state.phase)) {
+  if (state.phase === 'completed') {
+    message.textContent = 'Capture finished. These independent results do not verify identity or grant access. Incomplete evidence requires another check.';
+  }
+  if (['failed', 'stopped', 'completed'].includes(state.phase)) {
     running = false;
     events?.close();
     events = null;

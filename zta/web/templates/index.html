@@ -8,11 +8,12 @@
 </head>
 <body><main>
   <h1>ZTA verification prototype</h1>
-  <p>Live RGB-D media and depth-liveness check for the SSH access prototype.</p>
+  <p>Local RGB-D media, depth challenge, and pulse-evidence research prototype.</p>
   {% if username %}
   <p>Signed in as <strong>{{ username }}</strong>. <button id="logout">Sign out</button></p>
   <div><button id="start">Start camera check</button> <button id="stop" disabled>Stop</button></div>
-  <p>The OpenCV window shows RGB and aligned depth side by side. Follow its movement prompt; press Q or Esc there to stop.</p>
+  <p>The check uses the camera attached to this computer and measures pulse-related color changes in your face. Start only if you agree to this collection. Frames and pulse traces stay in temporary local memory.</p>
+  <p>Follow the depth prompt, then hold still in even lighting for pulse collection. Capture ends after 15 seconds; startup and cleanup can add time. Press Q or Esc in the preview, or select Stop, to cancel.</p>
   <p id="result">No evidence collected.</p>
   <p>These checks produce evidence only. They do not establish identity or grant SSH access.</p>
   {% else %}

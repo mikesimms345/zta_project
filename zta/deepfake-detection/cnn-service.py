@@ -61,11 +61,12 @@ class VerificationService:
         return capture
 
     def submit(self, key, owner, rgb_frame):
-        # Deliberately serialized for the single-process local harness. A production
-        # deployment should inject a durable store and a bounded inference worker.
+        # Validate ownership before inference, then recheck after it. Do not hold
+        # the session lock while a slow model prevents cancellation or expiry.
         with self._lock:
-            capture = self._get(key, owner)
-            prediction = self.classifier.classify(rgb_frame)
+            self._get(key, owner)
+        prediction = self.classifier.classify(rgb_frame)
+        with self._lock:
             capture = self._get(key, owner)  # inference may outlive the capture TTL
             if not isinstance(prediction.label, Label) or not prediction.model_id:
                 raise ModelUnavailable("Invalid classifier result")

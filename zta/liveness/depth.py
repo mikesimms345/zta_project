@@ -63,6 +63,8 @@ class DepthLivenessAnalyzer:
         faces = list(self._detect_faces(color))
         if not faces:
             return self._observation(frame, False, "no_face")
+        if len(faces) != 1:
+            return self._observation(frame, False, "multiple_faces")
         x, y, width, height = max(faces, key=lambda box: int(box[2]) * int(box[3]))
         x, y, width, height = (int(x), int(y), int(width), int(height))
         x = max(0, x)

@@ -83,6 +83,8 @@ class DepthLivenessPolicy:
             return "Depth surface appears too flat"
         if reason == "no_face":
             return "Center your face in the RGB view"
+        if reason == "multiple_faces":
+            return "Keep only one face in the camera view"
         if reason == "face_too_small":
             return "Move closer to the camera"
         if reason == "insufficient_depth":

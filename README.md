@@ -5,12 +5,14 @@
 Small prototype to prove use case.
 Local password accounts, browser start/stop controls, a Python-owned Intel
 RealSense RGB-D pipeline, replaceable video classification, depth-liveness
-evidence, and per-capture evidence windows. No
+evidence, CPU-only POS rPPG pulse evidence, and per-capture evidence windows. No
 conference rooms, WebRTC signaling, Socket.IO, audio initialization, or peer
 connections are needed. There is no raw-frame storage. Capture sessions expire
 after five minutes.
 
-Media evidence does not establish identity or grant access to anything yet.
+Media, depth, and pulse evidence do not establish identity or grant access.
+See [rPPG implementation and diagram](docs/rppg.md) for the algorithm, configuration,
+future biometric-processing boundary, tests, and Linux/Pi validation checklist.
 
 ## Run locally
 
@@ -94,11 +96,14 @@ check**. Python opens synchronized 640x480 RGB and depth streams through
 `pyrealsense2`; the browser does not request camera or microphone access. One
 OpenCV window shows RGB/LiteRT output and aligned depth/liveness side by side.
 Follow its prompt to move about 5 cm closer and then return to the starting
-position. Press **Q** or **Esc** in the preview, or select **Stop** in the browser,
-to end the check. Once the first 75 predictions are collected, inference
-continues with a rolling 75-frame window: each new result replaces the oldest.
-The camera is released on stop, logout/navigation cleanup, capture expiry, or a
-camera/model failure.
+position, then hold still in even lighting for at least eight seconds of pulse
+collection. Press **Q** or **Esc** in the preview, or select **Stop** in the browser,
+to cancel. Capture ends automatically after 15 seconds of measurement; SDK startup,
+pending reads, and consumer cleanup can add wall-clock time. Media, depth, and
+pulse outcomes are shown separately. A completed capture is not a successful
+verification; slow CNN processing may leave its 75-prediction window incomplete.
+The camera is released on deadline, stop, logout/navigation cleanup, capture
+expiry, or a camera/model failure. Set `ZTA_CAMERA_PREVIEW=0` for headless use.
 
 If more than one RealSense device is attached, select one by serial number before
 starting:
@@ -134,7 +139,7 @@ The development server binds to loopback only.
 | `zta/frame-handler.py` | RGB-D frame/source contracts, coordination, sampling, status lifecycle | Shared frame types and one Python-owned local camera worker |
 | `zta/realsense.py` | RealSense RGB-D capture, alignment, and conversion | Camera SDK boundary is injectable |
 | `zta/deepfake-detection/` | RGB validation and LiteRT inference alongside CNN contracts and policy | Classifier/runtime boundaries are injectable |
-| `zta/liveness/` | Depth geometry observations and temporal challenge policy | Independent from CNN media labels |
+| `zta/liveness/` | Depth geometry/challenge and POS pulse extraction | Independent evidence paths; no identity or access decision |
 | `zta/preview.py` | Side-by-side RGB and aligned-depth rendering | Presentation only; no evidence decisions |
 | `zta/accounts.py` | Local account storage and password checks | Replace with an identity-provider adapter |
 | `zta/web/` | HTTP, signed-in sessions, CSRF, controls, and status events | App factory accepts test adapters |
@@ -149,10 +154,11 @@ the worker creates the source, avoiding a circular import.
 This is a modular single-process application. Session storage is bounded and
 in-memory; a durable store/worker boundary is required before multi-worker use.
 The default policy retains the capstone's 75-frame window and 70% fake threshold.
-Python samples immediately, then waits 200 ms after each inference before the next
-sample. Seventy-five frames therefore need at least approximately 15 seconds plus
-inference and camera time. After that warm-up, the bounded window and status keep
-updating until the capture ends. Thresholds are inherited, not calibrated.
+Depth and CNN analysis now consume independent latest-frame queues with a 200 ms
+sampling interval; their processing does not add that interval to rPPG sampling.
+Pulse extraction consumes RGB arrivals and device timestamps directly. Capture
+has a 15-second measurement deadline; 75 CNN results may not fit on slow hardware.
+Thresholds are inherited/research defaults, not calibrated performance claims.
 
 ## Provenance and remaining work
 

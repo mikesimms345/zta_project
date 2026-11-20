@@ -3,7 +3,7 @@
 ## Current flow
 
 Browser local account login -> authenticated capture session -> Python-owned
-RealSense RGB-D source -> independent LiteRT media and depth-liveness paths ->
+RealSense RGB-D source -> independent LiteRT media, depth, and POS pulse paths ->
 server-sent status updates -> informational browser result.
 
 The application layer owns capture lifecycle. The model only produces a label and
@@ -24,8 +24,8 @@ now would add network contracts and distributed state without a demonstrated nee
 ## Current prototype architecture
 
 The signed-in browser is a control and status surface only. Selecting **Start
-camera check** creates a server capture and starts one Python background worker.
-That worker owns the complete local media path:
+camera check** creates a server capture and starts one Python capture worker plus
+two bounded analysis consumers. The capture worker remains the only SDK owner:
 
 ```text
 Local camera device
@@ -33,7 +33,8 @@ Local camera device
     -> align depth to RGB
     -> RGB --------> LiteRT .tflite inference -> rolling 75-sample media policy
     -> RGB + depth -> face-depth geometry ----> temporal liveness policy
-    -> RGB + colorized depth + both results -> side-by-side OpenCV preview
+    -> RGB + recent depth face region -------> POS pulse evidence
+    -> RGB + colorized depth + summaries ----> side-by-side OpenCV preview
     -> one server-sent event stream to the browser
 ```
 
@@ -44,11 +45,13 @@ selecting **Stop** in the browser, or signing out stops the worker and releases
 the camera. Leaving the page makes a best-effort cleanup request; capture expiry
 is the fallback if navigation interrupts it.
 
-The first 75 predictions fill the evidence window; they do not end the check.
-Python continues inference, and each later prediction evicts the oldest label
-before recalculating `flagged` or `below_threshold`. The camera and preview remain
-active until stop, logout/navigation cleanup, capture expiry, or a camera/model
-failure. The bounded deque keeps memory use fixed while the monitor runs.
+Capture now ends after a 15-second measurement schedule, with `completed` meaning
+measurement ended rather than verification passed. Startup/read/cleanup can add
+time. The CNN retains its 75-result rolling window, which may remain incomplete
+at the deadline. Depth and CNN receive separate latest-frame queues; POS consumes
+RGB arrival samples and device timestamps after the depth challenge. All queues
+and color traces are bounded. See [rPPG design and diagram](rppg.md) for timing,
+invalidation rules, evidence contracts, and future biometric-hash boundaries.
 
 There is no per-frame HTTP endpoint, browser camera permission, canvas encoding,
 or JPEG upload. Frames remain transient Python/OpenCV objects and are not saved.
@@ -118,7 +121,8 @@ its default RealSense adapter when creating the source to avoid a circular impor
 
 `RealSenseFrameSource` is the only RealSense SDK owner. It requests synchronized
 640x480 color and depth at 30 fps, aligns depth to color, and returns an SDK-free
-`RGBDFrame`. `DepthLivenessAnalyzer` detects the largest frontal face, measures
+`RGBDFrame`, now including an optional color sensor timestamp in seconds.
+`DepthLivenessAnalyzer` requires exactly one frontal face, measures
 valid depth inside an elliptical face region, removes a fitted depth plane, and
 requires at least 12 mm of residual relief for a candidate. The accepted median
 distance range is 0.3-1.5 m.

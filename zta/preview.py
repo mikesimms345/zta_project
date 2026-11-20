@@ -15,7 +15,7 @@ class SideBySidePreviewRenderer:
             self._cv2_module = cv2
         return self._cv2_module
 
-    def compose(self, frame, media_evidence=None, liveness=None):
+    def compose(self, frame, media_evidence=None, liveness=None, rppg=None):
         import numpy as np
 
         cv2 = self._cv2()
@@ -51,6 +51,12 @@ class SideBySidePreviewRenderer:
             )
         self._text(cv2, color, "RGB / LiteRT", 26)
         self._text(cv2, color, media_text, 52)
+        if rppg is not None:
+            pulse_text = f"Pulse: {rppg.status.value} ({rppg.duration_seconds:.1f}s)"
+            if rppg.bpm is not None:
+                pulse_text += f" ~{rppg.bpm:.0f} BPM"
+            self._text(cv2, color, pulse_text, 78, scale=0.48)
+            self._text(cv2, color, rppg.instruction, 104, scale=0.42)
         self._text(cv2, depth_view, "Aligned depth / liveness", 26)
         if liveness is not None:
             self._text(cv2, depth_view, f"Liveness: {liveness.status.value}", 52)
@@ -73,11 +79,11 @@ class SideBySidePreviewRenderer:
             scale, (255, 255, 255), 1, cv2.LINE_AA,
         )
 
-    def show(self, window_name, frame, media_evidence=None, liveness=None):
+    def show(self, window_name, frame, media_evidence=None, liveness=None, rppg=None):
         if not self.enabled:
             return False
         cv2 = self._cv2()
-        cv2.imshow(window_name, self.compose(frame, media_evidence, liveness))
+        cv2.imshow(window_name, self.compose(frame, media_evidence, liveness, rppg))
         return (cv2.waitKey(1) & 0xFF) in (27, ord("q"))
 
     def close(self, window_name):

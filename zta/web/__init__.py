@@ -1,6 +1,6 @@
 """Flask transport adapter and composition root for the local prototype."""
 from datetime import timedelta
-from functools import wraps
+from functools import partial, wraps
 from importlib import import_module
 import hmac
 import json
@@ -12,6 +12,7 @@ import click
 from flask import Flask, Response, jsonify, render_template, request, session, stream_with_context
 
 from ..accounts import LocalAccounts
+from ..liveness.rppg import PosRppgAnalyzer
 
 
 # Hyphenated package and module names require importlib rather than a from-import.
@@ -46,7 +47,9 @@ def create_app(config=None, *, classifier=None, accounts=None, capture_pipeline=
         MODEL_PATH=str(root / 'models' / 'lighter_quant_model.tflite'),
         WINDOW_SIZE=75, FAKE_THRESHOLD=0.70,
         REALSENSE_SERIAL=os.environ.get('ZTA_REALSENSE_SERIAL'),
-        SAMPLE_INTERVAL=0.2, CAMERA_PREVIEW=True,
+        SAMPLE_INTERVAL=0.2,
+        CAMERA_PREVIEW=os.environ.get('ZTA_CAMERA_PREVIEW', '1') != '0',
+        CAPTURE_SECONDS=15.0, RPPG_WINDOW_SECONDS=10.0, RPPG_MIN_SECONDS=8.0,
     )
     if config:
         app.config.update(config)
@@ -60,6 +63,11 @@ def create_app(config=None, *, classifier=None, accounts=None, capture_pipeline=
         device_serial=app.config['REALSENSE_SERIAL'],
         sample_interval=app.config['SAMPLE_INTERVAL'],
         preview=app.config['CAMERA_PREVIEW'],
+        capture_seconds=app.config['CAPTURE_SECONDS'],
+        rppg_factory=partial(
+            PosRppgAnalyzer, window_seconds=app.config['RPPG_WINDOW_SECONDS'],
+            min_seconds=app.config['RPPG_MIN_SECONDS'],
+        ),
     )
     app.extensions['verification'] = service
     app.extensions['accounts'] = accounts

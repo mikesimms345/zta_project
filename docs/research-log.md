@@ -1,5 +1,19 @@
 # Research log
 
+### 2026-11-20 — POS baseline and pulse evidence boundary
+
+- **Source:** https://doi.org/10.1109/TBME.2016.2609282
+- **Finding:** POS provides a model-free RGB projection baseline. This branch
+  implements overlapping 1.6-second projection windows in NumPy, with bounded
+  per-region traces, timing invalidation and independent media/depth consumers.
+- **Confidence:** confirmed for the implementation and synthetic test behavior;
+  pulse accuracy, presentation-attack resistance and Pi throughput are unverified.
+- **Security implication:** https://github.com/marukosan93/OR-PAD documents
+  forged rPPG in presentation attacks. A detected pulse is supporting evidence,
+  not a live-person proof, identity match, or reusable biometric key.
+- **Follow-up:** See `docs/rppg.md` for Linux/Pi SDK considerations, verification
+  instructions, limitations, output contracts and the implementation diagram.
+
 ### 2026-11-12 — macOS RealSense stream startup crash
 
 - **Sources:** https://github.com/cansik/pyrealsense2-macosx/issues/14 and

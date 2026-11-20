@@ -1,5 +1,27 @@
 # Decision log
 
+### 2026-11-20 — CPU-first POS rPPG MVP and bounded capture
+
+- **Status:** decided
+- **Decision:** Add an original NumPy POS extractor using three facial RGB
+  regions after the depth challenge. Keep CNN, depth, and pulse evidence separate.
+  Use independent one-slot depth/CNN queues and a 15-second capture schedule.
+- **Why:** Establish a lightweight baseline for Pi 5 (8/16 GB, 64-bit Linux) and
+  Ubuntu without weights, external inference, or an NVIDIA requirement. Preserve
+  the option to compare FacePhys and other learned extractors later.
+- **Security impact:** Pulse presence/quality is not a validated liveness or
+  identity verdict. Reset on tracking/timing failures, clear local traces on
+  termination, discard late CNN results after cancellation/expiry, and expose
+  only summaries to the browser. Multiple visible faces now invalidate depth ROI.
+- **Alternatives considered:** Adding FacePhys weights now adds licensing and
+  model-validation work; putting rPPG behind the existing CNN sampling gate loses
+  temporal information; lowering the CNN window just to meet the deadline would
+  change uncalibrated decision behavior. A fused pass flag/hash is deferred.
+- **Consequences / next steps:** Documented in `docs/rppg.md`, with a Mermaid
+  diagram and synthetic/lifecycle tests. Measure real D435/Pi timing and memory,
+  pulse reference accuracy and attack behavior; calibrate any future combined
+  policy. The 15-second schedule does not promise hard real-time completion.
+
 ### 2026-11-12 — Group the deepfake detection workflow
 
 - **Status:** decided

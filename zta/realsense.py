@@ -103,6 +103,7 @@ class RealSenseFrameSource:
             intrinsics=intrinsics,
             frame_number=int(color_frame.get_frame_number()),
             captured_at=self.clock(),
+            sensor_timestamp=float(color_frame.get_timestamp()) / 1000.0,
         )
 
     def stop(self):
